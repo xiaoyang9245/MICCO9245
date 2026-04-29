@@ -551,25 +551,43 @@
                 return data;
             }
 
-            async function doLogin() {
-                try {
-                    const msResponse = await msalInstance.loginPopup(loginRequest);
-                    const msToken = msResponse.accessToken;
-                    const graphRes = await fetch("https://graph.microsoft.com/v1.0/me", { headers: { Authorization: `Bearer ${msToken}` } });
-                    const msData = await graphRes.json();
-                    currentMsUser = { displayName: msData.displayName, id: msData.id, email: msData.userPrincipalName };
-                    const xblToken = await getXboxToken(msToken);
-                    const xstsData = await getXstsToken(xblToken);
-                    const mcToken = await getMinecraftToken(xstsData.userHash, xstsData.token);
-                    const profile = await getMinecraftProfile(mcToken);
-                    currentMcProfile = { name: profile.name, id: profile.id };
-                    localStorage.setItem('mc_auth', JSON.stringify({ mcProfile: currentMcProfile, msUser: currentMsUser }));
-                    updateUserUI();
-                } catch (err) {
-                    console.error(err);
-                    alert("登录失败：" + (err.message || "未知错误"));
-                }
-            }
+async function doLogin() {
+    try {
+        const msResponse = await msalInstance.loginPopup(loginRequest);
+        const msToken = msResponse.accessToken;
+        const graphRes = await fetch("https://graph.microsoft.com/v1.0/me", { headers: { Authorization: `Bearer ${msToken}` } });
+        const msData = await graphRes.json();
+        currentMsUser = { displayName: msData.displayName, id: msData.id, email: msData.userPrincipalName };
+        const xblToken = await getXboxToken(msToken);
+        const xstsData = await getXstsToken(xblToken);
+        const mcToken = await getMinecraftToken(xstsData.userHash, xstsData.token);
+        const profile = await getMinecraftProfile(mcToken);
+        currentMcProfile = { name: profile.name, id: profile.id };
+        localStorage.setItem('mc_auth', JSON.stringify({ mcProfile: currentMcProfile, msUser: currentMsUser }));
+        updateUserUI();
+    } catch (err) {
+        console.error(err);
+        let friendlyMsg = "";
+        const msg = err.message || "";
+        const code = err.errorCode || "";
+        if (msg.includes("User cancelled") || code === "user_cancelled") {
+            friendlyMsg = "你已取消登录，请重新尝试。";
+        } else if (msg.includes("Xbox认证失败") || msg.includes("XErr")) {
+            friendlyMsg = "Xbox 认证失败，请确保你的微软账号拥有 Minecraft Java 版。";
+        } else if (msg.includes("XSTS认证失败")) {
+            friendlyMsg = "XSTS 认证失败，请稍后重试。";
+        } else if (msg.includes("Minecraft令牌获取失败")) {
+            friendlyMsg = "无法获取 Minecraft 令牌，请确保你的账号已购买 Minecraft Java 版。";
+        } else if (msg.includes("玩家档案获取失败")) {
+            friendlyMsg = "无法获取玩家档案，请确保你的账号已迁移并拥有 Java 版。";
+        } else if (msg.includes("NetworkError") || msg.includes("fetch")) {
+            friendlyMsg = "网络错误，请检查网络后重试。";
+        } else {
+            friendlyMsg = "登录失败：" + msg;
+        }
+        alert(friendlyMsg);
+    }
+}
 
             function doLogout() {
                 localStorage.removeItem('mc_auth');
